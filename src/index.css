@@ -1,0 +1,152 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: oklch(0.08 0.01 270);
+    --foreground: oklch(0.98 0.005 90);
+    --card: oklch(0.11 0.015 270);
+    --card-foreground: oklch(0.95 0.01 90);
+    --popover: oklch(0.09 0.01 270);
+    --popover-foreground: oklch(0.98 0.005 90);
+    --primary: oklch(0.72 0.22 145);
+    --primary-foreground: oklch(0.05 0.01 270);
+    --secondary: oklch(0.18 0.02 270);
+    --secondary-foreground: oklch(0.95 0.01 90);
+    --muted: oklch(0.16 0.015 270);
+    --muted-foreground: oklch(0.55 0.02 90);
+    --accent: oklch(0.68 0.24 60);
+    --accent-foreground: oklch(0.05 0.01 270);
+    --destructive: oklch(0.62 0.28 25);
+    --destructive-foreground: oklch(0.98 0.005 90);
+    --border: oklch(0.22 0.025 270);
+    --input: oklch(0.14 0.015 270);
+    --ring: oklch(0.72 0.22 145);
+    --radius: 0.25rem;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: 'Space Grotesk', system-ui, -apple-system, sans-serif;
+    font-size: 17px;
+    line-height: 1.6;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+
+  button, input, textarea {
+    font-size: 16px;
+  }
+
+  .text-xs {
+    font-size: 0.875rem;
+  }
+
+  .text-sm {
+    font-size: 1rem;
+  }
+
+  .text-base {
+    font-size: 1.125rem;
+  }
+
+  .text-lg {
+    font-size: 1.25rem;
+  }
+
+  .text-xl {
+    font-size: 1.5rem;
+  }
+
+  .text-2xl {
+    font-size: 1.875rem;
+  }
+
+  .text-3xl {
+    font-size: 2.25rem;
+  }
+}
+
+@layer components {
+  .glass-panel {
+    @apply backdrop-blur-xl border shadow-2xl rounded-lg;
+    background-color: rgba(28, 29, 36, 0.6);
+    border-color: rgba(56, 58, 69, 0.5);
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.05) inset,
+                0 20px 60px -20px rgba(0, 0, 0, 0.8),
+                0 0 40px -10px rgba(120, 255, 180, 0.1);
+  }
+
+  .neon-glow {
+    text-shadow: 0 0 10px currentColor, 0 0 20px currentColor, 0 0 30px currentColor;
+  }
+
+  .stat-bar {
+    @apply relative overflow-hidden rounded-full h-2.5 shadow-inner;
+    background-color: rgba(46, 48, 59, 0.5);
+  }
+
+  .stat-bar-fill {
+    @apply absolute inset-y-0 left-0 rounded-full transition-all duration-1000 ease-out;
+    box-shadow: 0 0 15px currentColor;
+  }
+
+  .scanline-bg {
+    background-image: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(255, 255, 255, 0.02) 2px,
+      rgba(255, 255, 255, 0.02) 4px
+    );
+  }
+}
+
+@layer utilities {
+  .animate-fade-in {
+    animation: fadeIn 0.5s ease-in;
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .animate-float-up {
+    animation: floatUp 1s ease-out forwards;
+  }
+
+  @keyframes floatUp {
+    from {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    to {
+      opacity: 0;
+      transform: translateY(-30px);
+    }
+  }
+
+  .animate-pulse-glow {
+    animation: pulseGlow 2s ease-in-out infinite;
+  }
+
+  @keyframes pulseGlow {
+    0%, 100% {
+      box-shadow: 0 0 5px rgba(120, 255, 180, 0.5);
+    }
+    50% {
+      box-shadow: 0 0 20px rgba(120, 255, 180, 0.8);
+    }
+  }
+}
