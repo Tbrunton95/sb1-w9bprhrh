@@ -161,10 +161,53 @@ Deno.serve(async (req: Request) => {
       if (gameState.vehicles && gameState.vehicles.length > 0) {
         context += `\n## VEHICLES\n`;
         gameState.vehicles.forEach((vehicle: any) => {
-          context += `  - ${vehicle.name}`;
-          if (vehicle.location) context += ` (at ${vehicle.location})`;
+          context += `  - ${vehicle.make_model || vehicle.name}`;
+          if (vehicle.parked_location || vehicle.location) context += ` (at ${vehicle.parked_location || vehicle.location})`;
           if (vehicle.condition) context += ` - Condition: ${vehicle.condition}%`;
+          if (vehicle.is_active) context += ` [ACTIVE]`;
           context += `\n`;
+        });
+      }
+
+      if (gameState.skills && gameState.skills.length > 0) {
+        context += `\n## PLAYER SKILLS\n`;
+        context += `Skills affect how well the player performs various actions. Higher levels = better outcomes.\n`;
+        const skillsByCategory: { [key: string]: any[] } = {};
+        gameState.skills.forEach((skill: any) => {
+          const cat = skill.skill_category || 'general';
+          if (!skillsByCategory[cat]) skillsByCategory[cat] = [];
+          skillsByCategory[cat].push(skill);
+        });
+        Object.entries(skillsByCategory).forEach(([category, skills]) => {
+          context += `${category.toUpperCase()}:\n`;
+          skills.forEach((skill: any) => {
+            context += `  - ${skill.skill_name}: Level ${skill.level}/10 (${skill.description || 'No description'})\n`;
+          });
+        });
+      }
+
+      if (gameState.safeHouses && gameState.safeHouses.length > 0) {
+        context += `\n## SAFE HOUSES / PROPERTIES\n`;
+        gameState.safeHouses.forEach((house: any) => {
+          context += `  - ${house.name} (${house.property_type} in ${house.location})`;
+          if (house.is_primary) context += ` [PRIMARY RESIDENCE]`;
+          context += `\n`;
+          context += `    Ownership: ${house.ownership}, Security: ${house.security_level}/10, Heat Protection: ${house.heat_protection}/10\n`;
+          if (house.stored_cash > 0 || (house.stored_drugs && Object.keys(house.stored_drugs).length > 0)) {
+            context += `    Stored: `;
+            if (house.stored_cash > 0) context += `£${house.stored_cash} cash`;
+            if (house.stored_drugs && Object.keys(house.stored_drugs).length > 0) {
+              const drugList = Object.entries(house.stored_drugs).map(([d, a]) => `${a}g ${d}`).join(', ');
+              context += `${house.stored_cash > 0 ? ', ' : ''}${drugList}`;
+            }
+            context += `\n`;
+          }
+          if (house.features && house.features.length > 0) {
+            context += `    Features: ${house.features.join(', ')}\n`;
+          }
+          if (house.discovered_by_police) {
+            context += `    WARNING: This location is KNOWN TO POLICE\n`;
+          }
         });
       }
 
@@ -238,6 +281,23 @@ ALWAYS respond with valid JSON in this structure:
 - timeAdvance: Minutes passed (typically 5-60). Phone calls: 5-15 min, meetings: 30-60 min, travel handled separately.
 - cashDelta/bankDelta: Money changes (can be negative). Use positive for gains, negative for costs.
 - drugsChanges: Object with drug names as keys and delta amounts as values (e.g., {"Cocaine": -10, "MDMA": 50})
+
+## SKILLS SYSTEM
+The player has skills that affect action outcomes. Consider skill levels when determining success/failure:
+- Level 1-3: Novice - frequent failures, obvious mistakes
+- Level 4-6: Competent - reasonable success rate, occasional slip-ups
+- Level 7-9: Expert - consistent success, impressive results
+- Level 10: Master - near-perfect execution, legendary reputation
+
+Skills include: Negotiation (deals/persuasion), Intimidation (threats/fear), Combat (fighting), Stealth (sneaking/evasion), Streetwise (reading situations), Driving (vehicles/chases), Resilience (stress/injuries).
+Reference skill levels naturally in narrative outcomes without explicitly stating numbers.
+
+## SAFE HOUSES
+The player may have properties they can use to store items, hide from police, or lay low. Consider:
+- Security level affects risk of raids when heat is high
+- Heat protection affects how much heat decreases when hiding there
+- Stored items are separate from carried inventory
+- Police may discover locations if player is careless
 
 ## TEMPORAL UPDATES
 You MUST update these fields when appropriate:

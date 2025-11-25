@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useGame } from '../context/GameContext';
-import { MapPin, DollarSign, Target, AlertCircle, User, Package, Users, Briefcase, Send, Map, Settings, Bell, Car, Smartphone } from 'lucide-react';
+import { MapPin, DollarSign, Target, AlertCircle, User, Package, Users, Briefcase, Send, Map, Settings, Bell, Car, Smartphone, Zap, Home } from 'lucide-react';
 import CharacterPanel from './CharacterPanel';
 import InventoryPanel from './InventoryPanel';
 import RelationshipsPanel from './RelationshipsPanel';
@@ -10,13 +10,15 @@ import MapPanel from './MapPanel';
 import { SettingsPanel } from './SettingsPanel';
 import VehiclesPanel from './VehiclesPanel';
 import TelephonePanel from './TelephonePanel';
+import SkillsPanel from './SkillsPanel';
+import SafeHousesPanel from './SafeHousesPanel';
 import TestDataButton from './TestDataButton';
 import NotificationLog from './NotificationLog';
 import { supabase } from '../services/supabase';
 import * as supabaseService from '../services/supabase';
 import StateChangeNotification, { useStateChangeNotifications } from './StateChangeNotification';
 
-type TabType = 'inventory' | 'npcs' | 'deals' | 'map' | 'vehicles' | 'phone' | 'settings';
+type TabType = 'inventory' | 'npcs' | 'skills' | 'deals' | 'map' | 'vehicles' | 'phone' | 'properties' | 'settings';
 
 export default function GameContainer() {
   const { state, dispatch, addConversationMessage, updateItemState, updateHeatLevel, addReputation, updateCash, advanceTime, addVehicle, updateVehicle } = useGame();
@@ -95,6 +97,8 @@ export default function GameContainer() {
             majorEvents: state.gameEvents.filter(e => e.event_category === 'major'),
             recentEvents: state.gameEvents.filter(e => e.event_category === 'recent').slice(0, 10),
             relationships: state.relationships,
+            skills: state.skills,
+            safeHouses: state.safeHouses,
           },
         }),
       });
@@ -291,6 +295,8 @@ export default function GameContainer() {
             recentEvents: state.gameEvents.filter(e => e.event_category === 'recent').slice(0, 10),
             relationships: state.relationships,
             vehicles: state.vehicles,
+            skills: state.skills,
+            safeHouses: state.safeHouses,
             enhanceMode: enhanceRP,
           },
         }),
@@ -892,10 +898,22 @@ export default function GameContainer() {
                   <Users className="w-4 h-4" />
                   Network
                 </button>
+                <button
+                  onClick={() => setActiveTab('skills')}
+                  className={`flex-1 px-3 py-2.5 flex items-center justify-center gap-1.5 text-xs font-mono font-bold uppercase transition ${
+                    activeTab === 'skills'
+                      ? 'bg-card text-primary border-b-2 border-primary'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  <Zap className="w-4 h-4" />
+                  Skills
+                </button>
               </div>
               <div className="p-4">
                 {activeTab === 'inventory' && <InventoryPanel inventory={state.inventory} itemStates={state.itemStates} onItemAction={handleItemAction} onDrugUse={handleDrugUse} />}
                 {activeTab === 'npcs' && <RelationshipsPanel relationships={state.relationships} />}
+                {activeTab === 'skills' && <SkillsPanel skills={state.skills} />}
               </div>
             </div>
           </div>
@@ -1013,6 +1031,17 @@ export default function GameContainer() {
                   Phone
                 </button>
                 <button
+                  onClick={() => setActiveTab('properties')}
+                  className={`flex-1 px-3 py-2.5 flex items-center justify-center gap-1.5 text-xs font-mono font-bold uppercase transition ${
+                    activeTab === 'properties'
+                      ? 'bg-card text-primary border-b-2 border-primary'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  <Home className="w-4 h-4" />
+                  Cribs
+                </button>
+                <button
                   onClick={() => setActiveTab('settings')}
                   className={`flex-1 px-3 py-2.5 flex items-center justify-center gap-1.5 text-xs font-mono font-bold uppercase transition ${
                     activeTab === 'settings'
@@ -1047,6 +1076,7 @@ export default function GameContainer() {
                     currentLocation={state.session?.current_location || 'Unknown'}
                   />
                 )}
+                {activeTab === 'properties' && <SafeHousesPanel safeHouses={state.safeHouses} />}
                 {activeTab === 'settings' && <SettingsPanel />}
               </div>
             </div>
