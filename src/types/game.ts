@@ -156,6 +156,46 @@ export interface Vehicle {
   updated_at: string;
 }
 
+export interface PlayerSkill {
+  id: string;
+  session_id: string;
+  skill_name: string;
+  skill_category: 'combat' | 'social' | 'criminal' | 'survival';
+  level: number;
+  experience: number;
+  experience_to_next: number;
+  description: string;
+  last_used: number | null;
+  times_used: number;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SafeHouse {
+  id: string;
+  session_id: string;
+  name: string;
+  location: string;
+  property_type: 'penthouse' | 'flat' | 'warehouse' | 'lockup' | 'bedsit' | 'house';
+  ownership: 'owned' | 'rented' | 'squatting' | 'family';
+  monthly_cost: number;
+  security_level: number;
+  storage_capacity: number;
+  heat_protection: number;
+  is_primary: boolean;
+  stored_cash: number;
+  stored_drugs: Record<string, number>;
+  stored_weapons: string[];
+  features: string[];
+  description: string;
+  discovered_by_police: boolean;
+  last_visited: number | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface GameState {
   session: GameSession | null;
   inventory: PlayerInventory | null;
@@ -167,6 +207,8 @@ export interface GameState {
   gameEvents: GameEvent[];
   itemStates: ItemState[];
   vehicles: Vehicle[];
+  skills: PlayerSkill[];
+  safeHouses: SafeHouse[];
   loading: boolean;
   error: string | null;
 }
