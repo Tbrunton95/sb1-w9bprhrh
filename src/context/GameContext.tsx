@@ -1,5 +1,5 @@
 import React, { createContext, useReducer, useCallback } from 'react';
-import { GameState, GameSession, PlayerInventory, Relationship, ActiveDeal, Location, ConversationMessage, ItemState, NPCConversation, GameEvent, Vehicle } from '../types/game';
+import { GameState, GameSession, PlayerInventory, Relationship, ActiveDeal, Location, ConversationMessage, ItemState, NPCConversation, GameEvent, Vehicle, PlayerSkill, SafeHouse } from '../types/game';
 import * as supabaseService from '../services/supabase';
 
 export const GameContext = createContext<GameContextType | undefined>(undefined);
@@ -29,6 +29,13 @@ interface GameContextType {
   setActiveVehicle: (vehicleId: string) => Promise<void>;
   refuelVehicle: (vehicleId: string, amount: number) => Promise<void>;
   repairVehicle: (vehicleId: string, cost: number) => Promise<void>;
+  // Skills
+  addSkillExperience: (skillName: string, xp: number) => Promise<{ leveledUp: boolean } | undefined>;
+  // Safe Houses
+  addSafeHouse: (safeHouse: Omit<SafeHouse, 'id' | 'session_id' | 'created_at' | 'updated_at'>) => Promise<void>;
+  updateSafeHouse: (safeHouseId: string, updates: Partial<SafeHouse>) => Promise<void>;
+  setPrimarySafeHouse: (safeHouseId: string) => Promise<void>;
+  stashAtSafeHouse: (safeHouseId: string, stash: { cash?: number; drugs?: Record<string, number>; weapons?: string[] }) => Promise<void>;
 }
 
 type GameAction =
@@ -47,6 +54,11 @@ type GameAction =
   | { type: 'SET_VEHICLES'; payload: Vehicle[] }
   | { type: 'ADD_VEHICLE'; payload: Vehicle }
   | { type: 'UPDATE_VEHICLE'; payload: Vehicle }
+  | { type: 'SET_SKILLS'; payload: PlayerSkill[] }
+  | { type: 'UPDATE_SKILL'; payload: PlayerSkill }
+  | { type: 'SET_SAFE_HOUSES'; payload: SafeHouse[] }
+  | { type: 'ADD_SAFE_HOUSE'; payload: SafeHouse }
+  | { type: 'UPDATE_SAFE_HOUSE'; payload: SafeHouse }
   | { type: 'SET_LOADING'; payload: boolean }
   | { type: 'SET_ERROR'; payload: string | null };
 
@@ -61,6 +73,8 @@ const initialState: GameState = {
   gameEvents: [],
   itemStates: [],
   vehicles: [],
+  skills: [],
+  safeHouses: [],
   loading: false,
   error: null,
 };
@@ -114,6 +128,29 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         ...state,
         vehicles: state.vehicles.map(vehicle =>
           vehicle.id === action.payload.id ? action.payload : vehicle
+        ),
+      };
+    case 'SET_SKILLS':
+      return { ...state, skills: action.payload };
+    case 'UPDATE_SKILL':
+      return {
+        ...state,
+        skills: state.skills.map(skill =>
+          skill.id === action.payload.id ? action.payload : skill
+        ),
+      };
+    case 'SET_SAFE_HOUSES':
+      return { ...state, safeHouses: action.payload };
+    case 'ADD_SAFE_HOUSE':
+      return {
+        ...state,
+        safeHouses: [...state.safeHouses, action.payload],
+      };
+    case 'UPDATE_SAFE_HOUSE':
+      return {
+        ...state,
+        safeHouses: state.safeHouses.map(house =>
+          house.id === action.payload.id ? action.payload : house
         ),
       };
     case 'SET_LOADING':
@@ -189,6 +226,23 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       console.log('Fetching vehicles...');
       const vehicles = await supabaseService.getVehicles(session.id);
       dispatch({ type: 'SET_VEHICLES', payload: vehicles });
+
+      console.log('Fetching skills...');
+      let skills = await supabaseService.getSkills(session.id);
+      if (skills.length === 0) {
+        console.log('No skills found, initializing default skills...');
+        skills = await supabaseService.initializeDefaultSkills(session.id);
+      }
+      dispatch({ type: 'SET_SKILLS', payload: skills });
+
+      console.log('Fetching safe houses...');
+      let safeHouses = await supabaseService.getSafeHouses(session.id);
+      if (safeHouses.length === 0) {
+        console.log('No safe houses found, initializing Kensington Penthouse...');
+        const penthouse = await supabaseService.initializeKensingtonPenthouse(session.id);
+        safeHouses = penthouse ? [penthouse] : [];
+      }
+      dispatch({ type: 'SET_SAFE_HOUSES', payload: safeHouses });
 
       console.log('Fetching item states...');
       const itemStates = await supabaseService.getItemStates(session.id);
@@ -600,6 +654,107 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     }
   }, [state.vehicles, state.inventory, updateCash, addConversationMessage]);
 
+  // ============================================
+  // SKILLS FUNCTIONS
+  // ============================================
+
+  const addSkillExperience = useCallback(async (skillName: string, xp: number) => {
+    if (!state.session) return;
+    try {
+      const result = await supabaseService.addSkillExperience(state.session.id, skillName, xp);
+      if (result.skill) {
+        dispatch({ type: 'UPDATE_SKILL', payload: result.skill });
+        if (result.leveledUp) {
+          await addConversationMessage(
+            'System',
+            `Skill Up! ${skillName} is now level ${result.skill.level}!`,
+            'system'
+          );
+        }
+      }
+      return { leveledUp: result.leveledUp };
+    } catch (error) {
+      dispatch({ type: 'SET_ERROR', payload: error instanceof Error ? error.message : 'Failed to add skill experience' });
+    }
+  }, [state.session, addConversationMessage]);
+
+  // ============================================
+  // SAFE HOUSES FUNCTIONS
+  // ============================================
+
+  const addSafeHouse = useCallback(async (safeHouse: any) => {
+    if (!state.session) return;
+    try {
+      const newSafeHouse = await supabaseService.createSafeHouse({
+        ...safeHouse,
+        session_id: state.session.id,
+      });
+      dispatch({ type: 'ADD_SAFE_HOUSE', payload: newSafeHouse });
+    } catch (error) {
+      dispatch({ type: 'SET_ERROR', payload: error instanceof Error ? error.message : 'Failed to add safe house' });
+    }
+  }, [state.session]);
+
+  const updateSafeHouseAction = useCallback(async (safeHouseId: string, updates: any) => {
+    try {
+      const updatedSafeHouse = await supabaseService.updateSafeHouse(safeHouseId, updates);
+      dispatch({ type: 'UPDATE_SAFE_HOUSE', payload: updatedSafeHouse });
+    } catch (error) {
+      dispatch({ type: 'SET_ERROR', payload: error instanceof Error ? error.message : 'Failed to update safe house' });
+    }
+  }, []);
+
+  const setPrimarySafeHouse = useCallback(async (safeHouseId: string) => {
+    if (!state.session) return;
+    try {
+      await supabaseService.setPrimarySafeHouse(state.session.id, safeHouseId);
+      const safeHouses = await supabaseService.getSafeHouses(state.session.id);
+      dispatch({ type: 'SET_SAFE_HOUSES', payload: safeHouses });
+    } catch (error) {
+      dispatch({ type: 'SET_ERROR', payload: error instanceof Error ? error.message : 'Failed to set primary safe house' });
+    }
+  }, [state.session]);
+
+  const stashAtSafeHouse = useCallback(async (
+    safeHouseId: string,
+    stash: { cash?: number; drugs?: Record<string, number>; weapons?: string[] }
+  ) => {
+    if (!state.session || !state.inventory) return;
+    try {
+      // Validate we have enough to stash
+      if (stash.cash && stash.cash > state.inventory.cash) {
+        dispatch({ type: 'SET_ERROR', payload: 'Not enough cash to stash' });
+        return;
+      }
+
+      const updatedSafeHouse = await supabaseService.stashAtSafeHouse(safeHouseId, stash);
+      dispatch({ type: 'UPDATE_SAFE_HOUSE', payload: updatedSafeHouse });
+
+      // Update inventory - remove stashed items
+      const inventoryUpdates: any = {};
+      if (stash.cash) {
+        inventoryUpdates.cash = state.inventory.cash - stash.cash;
+      }
+      if (stash.drugs) {
+        const newDrugs = { ...state.inventory.drugs };
+        for (const [drug, amount] of Object.entries(stash.drugs)) {
+          newDrugs[drug] = (newDrugs[drug] || 0) - amount;
+          if (newDrugs[drug] <= 0) delete newDrugs[drug];
+        }
+        inventoryUpdates.drugs = newDrugs;
+      }
+
+      if (Object.keys(inventoryUpdates).length > 0) {
+        const updatedInventory = await supabaseService.updateInventory(state.session.id, inventoryUpdates);
+        dispatch({ type: 'SET_INVENTORY', payload: updatedInventory });
+      }
+
+      await addConversationMessage('System', `Items stashed at safe house.`, 'system');
+    } catch (error) {
+      dispatch({ type: 'SET_ERROR', payload: error instanceof Error ? error.message : 'Failed to stash at safe house' });
+    }
+  }, [state.session, state.inventory, addConversationMessage]);
+
   const value: GameContextType = {
     state,
     dispatch,
@@ -625,6 +780,11 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     setActiveVehicle,
     refuelVehicle,
     repairVehicle,
+    addSkillExperience,
+    addSafeHouse,
+    updateSafeHouse: updateSafeHouseAction,
+    setPrimarySafeHouse,
+    stashAtSafeHouse,
   };
 
   return (

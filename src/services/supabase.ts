@@ -501,3 +501,293 @@ export async function deleteVehicle(vehicleId: string) {
 
   if (error) throw error;
 }
+
+// ============================================
+// SKILLS FUNCTIONS
+// ============================================
+
+export async function getSkills(sessionId: string) {
+  const { data, error } = await supabase
+    .from('player_skills')
+    .select('*')
+    .eq('session_id', sessionId)
+    .order('skill_category', { ascending: true });
+
+  if (error) throw error;
+  return data || [];
+}
+
+export async function createSkill(skillData: {
+  session_id: string;
+  skill_name: string;
+  skill_category: 'combat' | 'social' | 'criminal' | 'survival';
+  level?: number;
+  experience?: number;
+  experience_to_next?: number;
+  description?: string;
+}) {
+  const { data, error } = await supabase
+    .from('player_skills')
+    .insert([skillData])
+    .select()
+    .maybeSingle();
+
+  if (error) throw error;
+  return data;
+}
+
+export async function updateSkill(skillId: string, updates: {
+  level?: number;
+  experience?: number;
+  experience_to_next?: number;
+  last_used?: number;
+  times_used?: number;
+  metadata?: Record<string, unknown>;
+}) {
+  const { data, error } = await supabase
+    .from('player_skills')
+    .update({ ...updates, updated_at: new Date().toISOString() })
+    .eq('id', skillId)
+    .select()
+    .maybeSingle();
+
+  if (error) throw error;
+  return data;
+}
+
+export async function addSkillExperience(sessionId: string, skillName: string, xpGained: number) {
+  // Get current skill state
+  const { data: skill, error: fetchError } = await supabase
+    .from('player_skills')
+    .select('*')
+    .eq('session_id', sessionId)
+    .eq('skill_name', skillName)
+    .maybeSingle();
+
+  if (fetchError) throw fetchError;
+  if (!skill) throw new Error(`Skill ${skillName} not found`);
+
+  let newXP = skill.experience + xpGained;
+  let newLevel = skill.level;
+  let xpToNext = skill.experience_to_next;
+
+  // Check for level up
+  while (newXP >= xpToNext && newLevel < 10) {
+    newXP -= xpToNext;
+    newLevel += 1;
+    xpToNext = Math.floor(xpToNext * 1.5); // Each level requires 50% more XP
+  }
+
+  // Cap at level 10
+  if (newLevel >= 10) {
+    newLevel = 10;
+    newXP = 0;
+    xpToNext = 0;
+  }
+
+  const { data, error } = await supabase
+    .from('player_skills')
+    .update({
+      level: newLevel,
+      experience: newXP,
+      experience_to_next: xpToNext,
+      times_used: skill.times_used + 1,
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', skill.id)
+    .select()
+    .maybeSingle();
+
+  if (error) throw error;
+  return { skill: data, leveledUp: newLevel > skill.level };
+}
+
+export async function initializeDefaultSkills(sessionId: string) {
+  const defaultSkills = [
+    { skill_name: 'Negotiation', skill_category: 'social' as const, description: 'Affects deal prices, NPC trust gains, and persuasion success' },
+    { skill_name: 'Intimidation', skill_category: 'social' as const, description: 'Affects NPC fear responses, aggressive confrontations, and extortion' },
+    { skill_name: 'Combat', skill_category: 'combat' as const, description: 'Affects fight outcomes, weapon handling, and damage dealt' },
+    { skill_name: 'Stealth', skill_category: 'criminal' as const, description: 'Affects avoiding detection, sneaking, and surveillance evasion' },
+    { skill_name: 'Streetwise', skill_category: 'criminal' as const, description: 'Affects finding deals, spotting scams, and reading situations' },
+    { skill_name: 'Driving', skill_category: 'survival' as const, description: 'Affects vehicle handling, chases, and getaway success' },
+    { skill_name: 'Resilience', skill_category: 'survival' as const, description: 'Affects recovery from injuries, stress tolerance, and endurance' },
+  ];
+
+  const skillsToInsert = defaultSkills.map(skill => ({
+    session_id: sessionId,
+    ...skill,
+    level: 1,
+    experience: 0,
+    experience_to_next: 100
+  }));
+
+  const { data, error } = await supabase
+    .from('player_skills')
+    .insert(skillsToInsert)
+    .select();
+
+  if (error) throw error;
+  return data || [];
+}
+
+// ============================================
+// SAFE HOUSES FUNCTIONS
+// ============================================
+
+export async function getSafeHouses(sessionId: string) {
+  const { data, error } = await supabase
+    .from('safe_houses')
+    .select('*')
+    .eq('session_id', sessionId)
+    .order('is_primary', { ascending: false });
+
+  if (error) throw error;
+  return data || [];
+}
+
+export async function createSafeHouse(safeHouseData: {
+  session_id: string;
+  name: string;
+  location: string;
+  property_type: 'penthouse' | 'flat' | 'warehouse' | 'lockup' | 'bedsit' | 'house';
+  ownership: 'owned' | 'rented' | 'squatting' | 'family';
+  monthly_cost?: number;
+  security_level?: number;
+  storage_capacity?: number;
+  heat_protection?: number;
+  is_primary?: boolean;
+  features?: string[];
+  description?: string;
+}) {
+  const { data, error } = await supabase
+    .from('safe_houses')
+    .insert([safeHouseData])
+    .select()
+    .maybeSingle();
+
+  if (error) throw error;
+  return data;
+}
+
+export async function updateSafeHouse(safeHouseId: string, updates: {
+  stored_cash?: number;
+  stored_drugs?: Record<string, number>;
+  stored_weapons?: string[];
+  security_level?: number;
+  discovered_by_police?: boolean;
+  last_visited?: number;
+  is_primary?: boolean;
+  metadata?: Record<string, unknown>;
+}) {
+  const { data, error } = await supabase
+    .from('safe_houses')
+    .update({ ...updates, updated_at: new Date().toISOString() })
+    .eq('id', safeHouseId)
+    .select()
+    .maybeSingle();
+
+  if (error) throw error;
+  return data;
+}
+
+export async function setPrimarySafeHouse(sessionId: string, safeHouseId: string) {
+  // Clear all primary flags
+  await supabase
+    .from('safe_houses')
+    .update({ is_primary: false })
+    .eq('session_id', sessionId);
+
+  // Set new primary
+  const { data, error } = await supabase
+    .from('safe_houses')
+    .update({ is_primary: true, updated_at: new Date().toISOString() })
+    .eq('id', safeHouseId)
+    .select()
+    .maybeSingle();
+
+  if (error) throw error;
+  return data;
+}
+
+export async function deleteSafeHouse(safeHouseId: string) {
+  const { error } = await supabase
+    .from('safe_houses')
+    .delete()
+    .eq('id', safeHouseId);
+
+  if (error) throw error;
+}
+
+export async function stashAtSafeHouse(safeHouseId: string, stash: {
+  cash?: number;
+  drugs?: Record<string, number>;
+  weapons?: string[];
+}) {
+  // Get current safe house data
+  const { data: safeHouse, error: fetchError } = await supabase
+    .from('safe_houses')
+    .select('*')
+    .eq('id', safeHouseId)
+    .maybeSingle();
+
+  if (fetchError) throw fetchError;
+  if (!safeHouse) throw new Error('Safe house not found');
+
+  const updates: any = {};
+
+  if (stash.cash !== undefined) {
+    updates.stored_cash = (safeHouse.stored_cash || 0) + stash.cash;
+  }
+
+  if (stash.drugs) {
+    const currentDrugs = safeHouse.stored_drugs || {};
+    const newDrugs = { ...currentDrugs };
+    for (const [drug, amount] of Object.entries(stash.drugs)) {
+      newDrugs[drug] = (newDrugs[drug] || 0) + amount;
+    }
+    updates.stored_drugs = newDrugs;
+  }
+
+  if (stash.weapons) {
+    updates.stored_weapons = [...(safeHouse.stored_weapons || []), ...stash.weapons];
+  }
+
+  const { data, error } = await supabase
+    .from('safe_houses')
+    .update({ ...updates, updated_at: new Date().toISOString() })
+    .eq('id', safeHouseId)
+    .select()
+    .maybeSingle();
+
+  if (error) throw error;
+  return data;
+}
+
+export async function initializeKensingtonPenthouse(sessionId: string) {
+  const penthouse = {
+    session_id: sessionId,
+    name: 'Kensington Penthouse',
+    location: 'Kensington',
+    property_type: 'penthouse' as const,
+    ownership: 'family' as const,
+    monthly_cost: 0, // Family owns it
+    security_level: 8,
+    storage_capacity: 200,
+    heat_protection: 7,
+    is_primary: true,
+    stored_cash: 0,
+    stored_drugs: {},
+    stored_weapons: [],
+    features: ['concierge', 'parking_garage', 'hidden_safe', 'cctv', 'panic_room'],
+    description: 'A luxurious penthouse overlooking Hyde Park. Floor-to-ceiling windows, marble countertops, the kind of place that screams money. Your family owns it, but they\'re never around. Mrs. O keeps it running.'
+  };
+
+  const { data, error } = await supabase
+    .from('safe_houses')
+    .insert([penthouse])
+    .select()
+    .maybeSingle();
+
+  if (error) throw error;
+  return data;
+}
